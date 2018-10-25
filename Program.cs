@@ -11,11 +11,12 @@ namespace InfluxDb._1secBench
   class Program
   {
     const int TanksCount = 30;
-    const long Days = 1;
-    const long BatchSize = 50_000L;
+    const int Days = 365;
+    const int BatchSize = 50_000;
 
     static readonly Guid[] _tanksIds = GetTanksIds();
     static readonly Random _rnd = new Random();
+    static int _ticks = 0;
 
     static async Task Main(string[] args)
     {
@@ -24,19 +25,26 @@ namespace InfluxDb._1secBench
 
       var readingCount = TanksCount * (long)TimeSpan.FromDays(Days).TotalSeconds;
       var batchSteps = readingCount / BatchSize;
-      for (long i = 0; i < batchSteps; ++i)
+
+      using (var progress = new ProgressBar())
       {
-        await WriteBatch(client, BatchSize);
+        for (var i = 0L; i < batchSteps; ++i)
+        {
+          progress.Report((double)i / batchSteps);
+          await WriteBatch(client, BatchSize);
+        }
       }
 
       var lastBatchSize = readingCount - batchSteps * BatchSize;
       await WriteBatch(client, lastBatchSize);
+
+      Console.WriteLine($"{readingCount} series successfully written!");
     }
 
     static async Task WriteBatch(InfluxDbClient client, long batchSize)
     {
       var readings = new List<Point>();
-      for (long j = 0; j < batchSize; ++j)
+      for (var j = 0L; j < batchSize; ++j)
       {
         readings.Add(GenerateReading());
       }
@@ -48,6 +56,7 @@ namespace InfluxDb._1secBench
       var reading = new Point()
       {
         Name = "reading",
+        Timestamp = DateTime.Now.AddDays(-Days).AddSeconds(-_ticks++),
         Tags = new Dictionary<string, object>()
         {
           { "CIPTankId", _tanksIds[_rnd.Next(0, TanksCount)] }
